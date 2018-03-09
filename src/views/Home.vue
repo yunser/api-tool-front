@@ -98,7 +98,8 @@
             }
         },
         mounted () {
-            this.request()
+            this.url = this.$storage.get('url', this.url)
+            // this.request()
         },
         methods: {
             handler(response) {
@@ -119,6 +120,7 @@
                 if (!this.url) {
                     return
                 }
+                this.$storage.set('url', this.url)
                 this.startTime = new Date().getTime()
 
 //                var methor
@@ -126,7 +128,33 @@
                     // headers: this.requestHeader
                 }
                 if (this.type === 'GET') {
-                    this.$http.get(this.url, options).then(this.handler)
+                    this.$http.get(this.url, options)
+                        .catch(function (error) {
+                            console.log('错误2')
+                            console.log(error)
+                            // this.handler(response)
+                            if (error.response) {
+                                // The request was made and the server responded with a status code
+                                // that falls out of the range of 2x
+                                this.result = JSON.stringify(error.response.data)
+                                console.log(error.response.data)
+                                // console.log(error.response.status)
+                                // console.log(error.response.headers)
+                            } else if (error.request) {
+                            // The request was made but no response was received
+                            // `error.request` is an instance of XMLHttpRequest in the browser and an instance of
+                            // http.ClientRequest in node.js
+                                // console.log(error.request)
+                            } else {
+                            // Something happened in setting up the request that triggered an Error
+                                // console.log('Error', error.message)
+                            }
+                            // console.log(error.config)
+                        })
+                        .then(this.handler, (a, b) => {
+                            console.log('错误')
+                            console.log(a, b)
+                        })
                 } else {
                     this.$http.post(this.url, this.params, options).then(this.handler)
                 }
