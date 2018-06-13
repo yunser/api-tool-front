@@ -5,6 +5,7 @@ const Home = resolve => require(['@/views/Home'], resolve)
 const Help = resolve => require(['@/views/Help'], resolve)
 const About = resolve => require(['@/views/About'], resolve)
 const Plugin = resolve => require(['@/views/Plugin'], resolve)
+const StatusCode = resolve => require(['@/views/StatusCode'], resolve)
 const Error404 = resolve => require(['@/views/error/Error404'], resolve)
 
 Vue.use(Router)
@@ -25,6 +26,10 @@ let routes = [
     {
         path: '/plugin',
         component: Plugin
+    },
+    {
+        path: '/status_code',
+        component: StatusCode
     },
     {
         path: '*',

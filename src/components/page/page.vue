@@ -6,6 +6,9 @@
                 <ui-list-item title="在线请求" to="/">
                     <ui-icon slot="left" value="grade"/>
                 </ui-list-item>
+                <ui-list-item title="HTTP 状态码" to="/status_code">
+                    <ui-icon slot="left" value="grade"/>
+                </ui-list-item>
                 <ui-list-item title="浏览器插件" to="/plugin">
                     <ui-icon slot="left" value="grade"/>
                 </ui-list-item>
