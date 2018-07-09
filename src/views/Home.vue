@@ -3,13 +3,14 @@
         <div class="layout-side">
             <div class="search-box">
                 <input class="input" v-model="keyword" placeholder="搜索接口" />
-                <ui-icon-button icon="search" @click="search" />
+                <!-- <ui-icon-button icon="search" @click="search" /> -->
+                <ui-icon-button icon="close" @click="keyword = ''" v-if="keyword.length" />
             </div>
             <div class="empty" v-if="!filterHistorys.length">暂无记录~</div>
             <ul class="historys-list">
-                <li class="item" v-for="item in filterHistorys">
-                    <span class="method" @click="selectItem(item)">{{ item.method }}</span>
-                    <span class="url" @click="selectItem(item)">{{ item.url }}</span>
+                <li class="item" v-for="item, index in filterHistorys">
+                    <span class="method" @click="selectItem(item, index)">{{ item.method }}</span>
+                    <span class="url" @click="selectItem(item, index)">{{ item.url }}</span>
                     <ui-icon-menu
                         class="icon"
                         icon="more_vert"
@@ -36,9 +37,10 @@
                             <ui-menu-item value="OPTIONS" title="OPTIONS"/>
                             <ui-menu-item value="TRACE" title="TRACE"/>
                         </ui-select-field>
-                        <ui-text-field class="url" v-model="request.url" placeholder="http://" />
+                        <ui-text-field class="url" v-model="request.url" hintText="http://" />
                         <ui-raised-button class="btn" label="发送" primary @click="doRequest" />
                         <ui-flat-button class="btn" label="保存" @click="save" />
+                        <ui-flat-button class="btn" label="新增" @click="newData" />
                     </div>
                 </div>
                 <ui-tabs class="tab-request" :value="activeTab2" @change="handleTabChange2">
@@ -120,8 +122,15 @@
                     </tr>
                 </table>
             </div>
-            <div class="container" v-if="activeTab2 === 'tests'">
-                <text-editor class="form-control test" v-model="testCode" />
+            <div class="container test-box" v-if="activeTab2 === 'tests'">
+                <text-editor class="form-control test" ref="testCode" v-model="testCode" />
+                <div class="test-help">
+                    <div>你可以用 JavaScript 代码编写测试用例，每次请求后自动执行测试用例。</div>
+                    <h2 class="title">代码片段</h2>
+                    <ul class="code-list">
+                        <li class="item" v-for="item in codes" @click="insertCode(item.code)">{{ item.text }}</li>
+                    </ul>
+                </div>
             </div>
             <div class="response-header">
                 <div class="response-text" v-if="!response.enable">Response</div>
@@ -166,7 +175,11 @@
                 </ui-article>
             </div>
             <div class="container response-tab-content" v-if="activeTab === 'tests'">
-                <div class="test-result-empty" v-if="!testResult.length">没有任何测试用例</div>
+                <div class="test-result-error" v-if="testError">
+                    <div class="text">执行测试用例出错</div>
+                    <pre class="code"><code>{{ testError }}</code></pre>
+                </div>
+                <div class="test-result-empty" v-else-if="!testResult.length">没有任何测试用例</div>
                 <ul class="test-result-list" v-if="testResult.length">
                     <li class="item" v-for="item in testResult">
                         <ui-badge class="state success" color="#4caf50" content="通过" v-if="item.isSuccess" />
@@ -177,7 +190,7 @@
                     </li>
                 </ul>
             </div>
-            <div class="container" v-if="activeTab === 'cookies'">
+            <div class="container response-tab-content" v-if="activeTab === 'cookies'">
                 <div class="cookie-empty">浏览器版本暂不支持 Cookie</div>
             </div>
         </section>
@@ -196,10 +209,55 @@
             <ui-appbar title="设置">
                 <ui-icon-button icon="close" slot="left" @click="toggleSetting" />
             </ui-appbar>
+            <!-- <div class="body"> -->
+                <!-- <ui-checkbox class="checkbox" v-model="isLocalRequest" label="本地调试" :value="true"/> -->
+                <!-- <br> -->
+                <!-- <ui-raised-button class="btn" label="清空收藏夹" @click="clearHistory" /> -->
+                <!-- <ui-raised-button class="btn" label="环境设置" @click="clearHistory" /> -->
+            <!-- </div> -->
+            <ui-list>
+                <ui-sub-header>基本设置</ui-sub-header>
+                <ui-list-item disableRipple @click="handleToggle('isLocalRequest')" title="本地调试">
+                    <ui-switch v-model="isLocalRequest" slot="right"/>
+                </ui-list-item>
+                <!-- <ui-list-item disableRipple @click="toggleEnv" title="环境设置">
+                    <ui-icon value="chevron_right" slot="right"/>
+                </ui-list-item> -->
+                <ui-list-item disableRipple @click="clearHistory" title="清空收藏夹">
+                </ui-list-item>
+            </ui-list>
+        </ui-drawer>
+        <ui-drawer class="env-box" right :open="envVisible" @close="toggleEnv()">
+            <ui-appbar title="环境">
+                <ui-icon-button icon="close" slot="left" @click="toggleEnv" />
+            </ui-appbar>
             <div class="body">
-                <ui-checkbox class="checkbox" v-model="isLocalRequest" label="本地调试" :value="true"/>
-                <br>
-                <ui-raised-button label="清空收藏夹" @click="clearHistory" />
+                <ui-text-field v-model="env.name" label="环境名称" />
+                <table class="key-value-table">
+                    <tr>
+                        <th class="col-enable"></th>
+                        <th class="col-key">变量名</th>
+                        <th class="col-value">值</th>
+                        <th class="col-op">
+                            <ui-icon-button class="remove" icon="add" @click="addVariable(index)" title="添加"/>
+                        </th>
+                    </tr>
+                    <tr v-for="variable, index in env.variables" :class="{disabled: !variable.enable}">
+                        <td class="col-enable">
+                            <ui-checkbox class="checkbox" v-model="variable.enable" label="" />
+                        </td>
+                        <td class="col-key">
+                            <input class="input" v-model="variable.name" placeholder="key">
+                        </td>
+                        <td class="col-value">
+                            <input class="input" v-model="variable.value" placeholder="value">
+                        </td>
+                        <td class="col-op">
+                            <ui-icon-button class="remove" icon="add" @click="addVariable(index)" title="添加"/>
+                            <ui-icon-button class="remove" icon="close" @click="removeVariable(index)" title="删除"/>
+                        </td>
+                    </tr>
+                </table>
             </div>
         </ui-drawer>
     </my-page>
@@ -207,6 +265,7 @@
 
 <script>
     const qs = require('qs')
+    const saveAs = window.saveAs
 
     export default {
         data () {
@@ -227,7 +286,8 @@
                 contentType: '',
                 requestRowBody: '',
                 type: 'GET',
-                testCode: 'tests["Status code is 200"] = responseCode.code === 200;\ntests["Status code is 404"] = responseCode.code === 404;',
+                testError: false,
+                testCode: ``,
                 testResult: [
                     // {
                     //     text: 'Status code is 200',
@@ -264,9 +324,51 @@
                 showParams: true,
                 drawerVisible: false,
                 settingVisible: false,
+                envVisible: false,
                 isLocalRequest: true,
+                codes: [
+                    {
+                        text: '状态码为 200',
+                        code: 'tests["Status code is 200"] = responseCode.code === 200;'
+                    },
+                    {
+                        text: '响应时间小于 200 毫秒',
+                        code: 'tests["Response time is less than 200ms"] = responseTime < 200;'
+                    },
+                    {
+                        text: '返回内容 name 属性为 yunser',
+                        code: `let jsonData = JSON.parse(responseBody);
+tests["test name attribute"] = jsonData.name === 'yunser';`
+                    },
+                    {
+                        text: 'Content-Type is application/json',
+                        code: `tests["Content-Type is present"] = util.getResponseHeader("Content-Type").includes('application/json');`
+                    }
+                ],
+                env: {
+                    name: '测试环境',
+                    variables: [
+                        {
+                            enable: true,
+                            name: 'url',
+                            value: 'http://localhost:1026'
+                        }
+                    ]
+                },
                 page: {
                     menu: [
+                        {
+                            type: 'icon',
+                            icon: 'code',
+                            click: this.toggleEnv,
+                            title: '环境设置'
+                        },
+                        {
+                            type: 'icon',
+                            icon: 'import_export',
+                            click: this.exportData,
+                            title: '导出'
+                        },
                         {
                             type: 'icon',
                             icon: 'settings',
@@ -315,15 +417,84 @@
                 // console.log(e.target.scrollTop)
             })
             // this.doTest()
+            // this.debug()
         },
         methods: {
+            newData() {
+                this.type = 'GET'
+                this.request.url = ''
+                this.activeTab2 = 'headers'
+                this.requestHeaders = [
+                    {
+                        enable: true,
+                        key: '',
+                        value: ''
+                    }
+                ]
+                this.params = [
+                    {
+                        enable: true,
+                        key: '',
+                        value: ''
+                    }
+                ]
+                this.responseHeaders = [
+                    {
+                        key: '',
+                        value: ''
+                    }
+                ]
+                // this.$refs.testCode.setValue('')
+                this.testCode = ''
+                this.requestType = 'form_data' // TODO
+                this.requestRowBody = '' // TODO
+                this.response.enable = false
+                this.response.body = '' // TODO
+            },
+            insertCode(code) {
+                if (this.testCode.length) {
+                    this.$refs.testCode.setValue(this.testCode.replace(/\n+$/, '') + '\n\n' + code)
+                } else {
+                    this.$refs.testCode.setValue(code)
+                }
+                // this.testCode = this.testCode += '\n\n' + code
+            },
+            debug() {
+                this.activeTab2 = 'tests'
+            },
+            toggleEnv() {
+                this.envVisible = !this.envVisible
+            },
+            handleToggle(key) {
+                this[key] = !this[key]
+            },
             doTest() {
-                window.status = parseInt(this.status)
+                window._status = parseInt(this.status)
+                window._time = this.time
+                window._responseBody = this.response.body
+                window._responseHeaders = {}
+                for (let item of this.responseHeaders) {
+                    window._responseHeaders[item.key] = item.value
+                }
                 console.log('window.status', window.status)
-                let code = `let tests = {};
+                let code = `let tests = {}
                     let responseCode = {
                         code: parseInt(window.status)
-                    };
+                    }
+                    let util = {
+                        getResponseHeader(name) {
+                            if (window._responseHeaders[name]) {
+                                return window._responseHeaders[name]
+                            }
+                            if (window._responseHeaders[name.toLowerCase()]) {
+                                return window._responseHeaders[name.toLowerCase()]
+                            }
+                            return ''
+                        }
+                    }
+                    util.getResponseHeader("Content-Type")
+                    let responseBody = window._responseBody
+                    let responseTime = window._time
                     console.log(responseCode)
                     console.log('test start');` + this.testCode +
                     `window.tests = tests
@@ -357,19 +528,29 @@
             removeItem(item, index) {
                 this.historys.splice(index, 1)
             },
-            selectItem(item) {
+            selectItem(item, index) {
+                this.editItemIndex = index
                 this.request.url = item.url
                 this.type = item.method
                 this.requestHeaders = item.requestHeaders || []
                 this.params = item.params || []
+                this.testCode = item.params || []
+                this.testCode = item.testCode || ''
+                this.$refs.testCode.setValue(item.testCode || '')
             },
             save() {
-                this.historys.unshift({
+                let item = {
                     method: this.type,
                     url: this.request.url,
                     requestHeaders: this.requestHeaders,
-                    params: this.params
-                })
+                    params: this.params,
+                    testCode: this.testCode
+                }
+                if (!this.editItemIndex && this.editItemIndex !== 0) {
+                    this.historys.unshift(item)
+                } else {
+                    this.historys.splice(this.editItemIndex, 1, item)
+                }
                 this.$storage.set('historys', this.historys)
             },
             clearHistory() {
@@ -394,7 +575,13 @@
                 this.loading = false
             },
             afterRequest() {
-                this.doTest()
+                try {
+                    this.doTest()
+                } catch (err) {
+                    console.log('test error')
+                    console.log(err)
+                    this.testError = err.toString()
+                }
             },
             handlerError(response) {
                 console.log('错2误')
@@ -413,6 +600,17 @@
                 this.afterRequest()
                 this.loading = false
             },
+            getUrl() {
+                let url = this.request.url
+                for (let variable of this.env.variables) {
+                    if (!variable.name) {
+                        continue
+                    }
+                    url = url.replace(`{{${variable.name}}}`, variable.value)
+                }
+                console.log('返回', url)
+                return url
+            },
             doRequest() {
                 if (!this.request.url) {
                     this.$message({
@@ -421,8 +619,18 @@
                     })
                     return
                 }
-                this.$storage.set('url', this.request.url)
+                let url = this.getUrl()
+                if (!/^http/.test(url)) {
+                    this.$message({
+                        type: 'danger',
+                        text: 'URL 必须以 http 开头'
+                    })
+                    return
+                }
+
+                this.$storage.set('url', url)
                 this.startTime = new Date().getTime()
+                this.testError = false
                 this.responseHeaders = []
                 this.response.enable = false
                 this.loading = true
@@ -470,20 +678,23 @@
                         options.headers[header.key] = header.value
                     }
                 }
+                let url = this.getUrl()
                 if (this.type === 'GET' || this.type === 'HEAD') {
-                    this.$http[this.type.toLowerCase()](this.request.url, options)
-                        .then(this.handler, this.handlerError).catch(this.handlerError)
+                    this.$http[this.type.toLowerCase()](url, options)
+                        .then(this.handler, this.handlerError)
+                        .catch(this.handlerError)
                 } else {
-                    this.$http.post(this.url, data, options)
+                    this.$http[this.type.toLowerCase()](url, data, options)
                         .then(this.handler)
                         .catch(this.handlerError)
                 }
             },
             remoteRequest() {
                 console.log('remoteRequest')
+                let url = this.getUrl()
                 this.$http.post('http', {
                     method: this.type,
-                    url: this.request.url,
+                    url: url,
                     params: this.params.filter(item => item.key && item.enable),
                     requestHeaders: this.requestHeaders.filter(item => item.key && item.enable)
                 }).then(response => {
@@ -519,6 +730,16 @@
             removeParam(index) {
                 this.params.splice(index, 1)
             },
+            addVariable(index) {
+                this.env.variables.splice(index + 1, 0, {
+                    enable: true,
+                    name: '',
+                    value: ''
+                })
+            },
+            removeVariable(index) {
+                this.env.variables.splice(index, 1)
+            },
             clear() {
                 this.text = ''
                 this.compute()
@@ -541,6 +762,14 @@
                 }
             },
             search() {
+            },
+            exportData() {
+                let obj = {
+                    version: '1.0.0'
+                }
+                let content = JSON.stringify(obj, null, 4)
+                let blob = new Blob([content], {type: 'text/plain;charset=utf-8'})
+                saveAs(blob, 'api.json')
             }
         },
         watch: {

@@ -15,7 +15,8 @@
         data() {
             return {
                 id: '',
-                editorContent: ''
+                editorContent: '',
+                canEmit: true
             }
         },
         props: {
@@ -35,6 +36,10 @@
                 this.editor.setOption('wrap', 'free') // 自动换行,设置为off关闭
                 this.editor.setValue(this.editorContent)
                 this.editor.getSession().on('change', e => {
+                    if (!this.canEmit) {
+                        this.canEmit = true
+                        return
+                    }
                     this.editorContent = this.editor.getValue()
                     this.$emit('input', this.editorContent)
                 })
@@ -44,6 +49,17 @@
             this.editor.destroy()
         },
         methods: {
+            setValue(value) {
+                this.editor.setValue(value)
+            }
+        },
+        watch: {
+            value() {
+                console.log('呵呵')
+                console.log(this.value)
+                // this.editor.setValue(this.value)
+                this.canEmit = false
+            }
         }
     }
 </script>
