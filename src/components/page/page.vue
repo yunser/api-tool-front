@@ -1,5 +1,5 @@
 <template>
-    <ui-page :title="title || page.title" ref="page">
+    <ui-page :title="title || page.title" :page="page" :backable="backable" ref="page">
         <div slot="drawer">
             <ui-appbar title=""></ui-appbar>
             <ui-list @itemClick="toggle()">
@@ -7,6 +7,12 @@
                     <ui-icon slot="left" value="grade"/>
                 </ui-list-item>
                 <ui-list-item title="HTTP 状态码" to="/status_code">
+                    <ui-icon slot="left" value="grade"/>
+                </ui-list-item>
+                <ui-list-item title="HTTP 请求头" to="/request_header">
+                    <ui-icon slot="left" value="grade"/>
+                </ui-list-item>
+                <ui-list-item title="HTTP 响应头" to="/response_header">
                     <ui-icon slot="left" value="grade"/>
                 </ui-list-item>
                 <ui-list-item title="浏览器插件" to="/plugin">
