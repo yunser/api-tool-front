@@ -2,8 +2,7 @@ import Vue from 'vue'
 import Router from 'vue-router'
 
 const Home = resolve => require(['@/views/Home'], resolve)
-const Help = resolve => require(['@/views/Help'], resolve)
-const About = resolve => require(['@/views/About'], resolve)
+const Request = resolve => require(['@/views/Request'], resolve)
 const Plugin = resolve => require(['@/views/Plugin'], resolve)
 const StatusCode = resolve => require(['@/views/StatusCode'], resolve)
 const RequestHeader = resolve => require(['@/views/RequestHeader'], resolve)
@@ -18,12 +17,8 @@ let routes = [
         component: Home
     },
     {
-        path: '/about',
-        component: About
-    },
-    {
-        path: '/help',
-        component: Help
+        path: '/request',
+        component: Request
     },
     {
         path: '/plugin',
